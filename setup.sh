@@ -198,6 +198,7 @@ wget -q https://raw.githubusercontent.com/hestiacp/hestiacp/release/install/hst-
 print_info "Запуск установки..."
 bash hst-install.sh \
     --interactive no \
+    --username "$HESTIA_USER" \
     --email "$EMAIL" \
     --password "$HESTIA_PASSWORD" \
     --hostname "$HOSTNAME" \
