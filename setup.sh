@@ -11,105 +11,110 @@ if [ -f /usr/local/hestia/bin/hestia ]; then
     echo "✅ HestiaCP уже установлена!"
     echo "🚀 Продолжаем настройку доменов..."
     
-    # Загружаем функции
-    export PATH="/usr/local/hestia/bin:$PATH"
-    source /usr/local/hestia/func/main.sh 2>/dev/null
-    
-    # Проверяем, что команды доступны
-    if command -v v-add-domain &> /dev/null; then
-        echo "✅ Команды HestiaCP доступны!"
-        
-        # Читаем сохранённые данные
-        if [ -f /root/hestia_domains.txt ]; then
-            DOMAINS=$(cat /root/hestia_domains.txt)
-            HESTIA_USER=$(cat /root/hestia_user.txt 2>/dev/null || echo "batrider")
-        else
-            echo "⚠️ Файл с доменами не найден!"
-            exit 1
-        fi
-        
-        # Клонируем репозиторий с файлами
-        echo "📥 Клонирование репозитория с файлами..."
-        git clone https://github.com/yukutakanawa/hestia-deploy.git /tmp/hestia-deploy 2>/dev/null || echo "⚠️ Репозиторий уже склонирован"
-        
-        # Добавляем домены
-        for d in $DOMAINS; do
-            echo ""
-            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            echo "📂 Обработка домена: $d"
-            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            
-            # 1. Добавляем домен
-            echo -n "  ➕ Добавление домена... "
-            v-add-domain "$HESTIA_USER" "$d" 2>/dev/null
-            v-add-web-domain "$HESTIA_USER" "$d" 2>/dev/null
-            echo "✅"
-            
-            # 2. Создаём папку
-            PUBLIC_HTML="/home/$HESTIA_USER/web/$d/public_html"
-            mkdir -p "$PUBLIC_HTML"
-            rm -f "$PUBLIC_HTML/index.html"
-            
-            # 3. Загружаем файлы
-            echo "  📤 Загрузка файлов..."
-            for f in /tmp/hestia-deploy/*; do
-                filename=$(basename "$f")
-                if [ "$filename" != "setup.sh" ] && [ "$filename" != "deploy.sh" ] && [ -f "$f" ]; then
-                    cp "$f" "$PUBLIC_HTML/"
-                    echo "    ✅ $filename"
-                fi
-            done
-            chown -R "$HESTIA_USER":"$HESTIA_USER" "$PUBLIC_HTML"
-            
-            # 4. SSL
-            echo -n "  🔐 Установка SSL... "
-            if v-add-letsencrypt-domain "$HESTIA_USER" "$d" 2>/dev/null; then
-                echo "✅"
-            else
-                echo "⚠️ (возможно домен не направлен)"
-            fi
-            
-            echo -n "  🔄 Включение HTTPS редиректа... "
-            if v-add-web-domain-ssl-force "$HESTIA_USER" "$d" 2>/dev/null; then
-                echo "✅"
-            else
-                echo "⚠️"
-            fi
-            
-            echo "✅ $d готов"
-        done
-        
-        # Очистка
-        rm -f /root/hestia_domains.txt /root/hestia_user.txt
-        rm -f /root/hestia_continue.sh
-        
-        # Удаляем задачу из crontab
-        crontab -l 2>/dev/null | grep -v "@reboot /root/hestia_continue.sh" | crontab - 2>/dev/null || true
-        
-        echo ""
-        echo "🎉 ВСЁ ГОТОВО!"
-        echo ""
-        echo "🔗 ВСЕ ДОМЕНЫ РАБОТАЮТ ПО HTTPS:"
-        for d in $DOMAINS; do
-            echo "  🔒 https://$d"
-        done
-        echo ""
-        echo "📝 ДОСТУП К ПАНЕЛИ: https://$(hostname):8083"
-        
-        exit 0
+    # Читаем сохранённые данные
+    if [ -f /root/hestia_domains.txt ]; then
+        DOMAINS=$(cat /root/hestia_domains.txt)
+        HESTIA_USER=$(cat /root/hestia_user.txt 2>/dev/null || echo "batrider")
     else
-        echo "⚠️ Команды HestiaCP пока не доступны"
-        echo "🔧 Пытаемся загрузить окружение..."
-        source /usr/local/hestia/func/main.sh 2>/dev/null
-        if command -v v-add-domain &> /dev/null; then
-            echo "✅ Команды загружены!"
-            exec "$0"
-        else
-            echo "❌ Не удалось загрузить команды."
-            echo "💡 Попробуйте перезагрузить сервер вручную: reboot"
-            exit 1
-        fi
+        echo "⚠️ Файл с доменами не найден!"
+        exit 1
     fi
+    
+    # Клонируем репозиторий с файлами (принудительно)
+    echo "📥 Клонирование репозитория с файлами..."
+    rm -rf /tmp/hestia-deploy
+    git clone https://github.com/yukutakanawa/hestia-deploy.git /tmp/hestia-deploy 2>/dev/null
+    if [ $? -ne 0 ]; then
+        echo "❌ Ошибка клонирования репозитория!"
+        exit 1
+    fi
+    echo "✅ Репозиторий склонирован"
+    
+    # Добавляем домены
+    for d in $DOMAINS; do
+        echo ""
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "📂 Обработка домена: $d"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        
+        # 1. Добавляем домен
+        echo -n "  ➕ Добавление домена... "
+        /usr/local/hestia/bin/v-add-domain "$HESTIA_USER" "$d" 2>/dev/null
+        /usr/local/hestia/bin/v-add-web-domain "$HESTIA_USER" "$d" 2>/dev/null
+        echo "✅"
+        
+        # 2. Создаём папку
+        PUBLIC_HTML="/home/$HESTIA_USER/web/$d/public_html"
+        mkdir -p "$PUBLIC_HTML"
+        
+        # 3. Удаляем ВСЕ старые файлы (index.html, index.php)
+        echo "  🗑️ Удаление старых файлов..."
+        rm -f "$PUBLIC_HTML/index.html"
+        rm -f "$PUBLIC_HTML/index.php"
+        rm -f "$PUBLIC_HTML/.htaccess"
+        echo "    ✅ Старые файлы удалены"
+        
+        # 4. Копируем файлы из репозитория
+        echo "  📤 Загрузка файлов из репозитория..."
+        for f in /tmp/hestia-deploy/*; do
+            filename=$(basename "$f")
+            if [ "$filename" != "setup.sh" ] && [ "$filename" != "deploy.sh" ] && [ -f "$f" ]; then
+                cp -f "$f" "$PUBLIC_HTML/"
+                echo "    ✅ $filename"
+            fi
+        done
+        
+        # 5. Устанавливаем права
+        echo "  🔧 Установка прав..."
+        chown -R "$HESTIA_USER":"$HESTIA_USER" "$PUBLIC_HTML"
+        chmod 755 "$PUBLIC_HTML"
+        chmod 644 "$PUBLIC_HTML/index.php" 2>/dev/null
+        chmod 644 "$PUBLIC_HTML/.htaccess" 2>/dev/null
+        echo "    ✅ Права установлены"
+        
+        # 6. SSL
+        echo -n "  🔐 Установка SSL... "
+        if /usr/local/hestia/bin/v-add-letsencrypt-domain "$HESTIA_USER" "$d" 2>/dev/null; then
+            echo "✅"
+        else
+            echo "⚠️ (возможно домен не направлен)"
+        fi
+        
+        echo -n "  🔄 Включение HTTPS редиректа... "
+        if /usr/local/hestia/bin/v-add-web-domain-ssl-force "$HESTIA_USER" "$d" 2>/dev/null; then
+            echo "✅"
+        else
+            echo "⚠️"
+        fi
+        
+        echo "✅ $d готов"
+    done
+    
+    # 7. Перезапускаем PHP (ВАЖНО!)
+    echo ""
+    echo "🔄 Перезапуск PHP-FPM..."
+    systemctl restart php8.5-fpm 2>/dev/null || systemctl restart php8.4-fpm 2>/dev/null || systemctl restart php8.3-fpm 2>/dev/null || echo "⚠️ Не удалось перезапустить PHP"
+    echo "✅ PHP перезапущен"
+    
+    # Очистка
+    rm -rf /tmp/hestia-deploy
+    rm -f /root/hestia_domains.txt /root/hestia_user.txt
+    rm -f /root/hestia_continue.sh
+    
+    # Удаляем задачу из crontab
+    crontab -l 2>/dev/null | grep -v "@reboot /root/hestia_continue.sh" | crontab - 2>/dev/null || true
+    
+    echo ""
+    echo "🎉 ВСЁ ГОТОВО!"
+    echo ""
+    echo "🔗 ВСЕ ДОМЕНЫ РАБОТАЮТ ПО HTTPS:"
+    for d in $DOMAINS; do
+        echo "  🔒 https://$d"
+    done
+    echo ""
+    echo "📝 ДОСТУП К ПАНЕЛИ: https://$(hostname):8083"
+    
+    exit 0
 fi
 
 # ============================================
@@ -283,7 +288,7 @@ print_step "Сохранение данных для продолжения"
 echo "${DOMAINS[@]}" > /root/hestia_domains.txt
 echo "$HESTIA_USER" > /root/hestia_user.txt
 
-# Создаём скрипт продолжения (на случай, если crontab не сработает)
+# Создаём скрипт продолжения
 cat > /root/hestia_continue.sh <<'EOF'
 #!/bin/bash
 # Продолжение установки после перезагрузки
@@ -291,13 +296,13 @@ cat > /root/hestia_continue.sh <<'EOF'
 EOF
 chmod +x /root/hestia_continue.sh
 
-# Копируем setup.sh в /root (если запускали из временной папки)
+# Копируем setup.sh в /root
 if [ -f "$0" ]; then
-    cp "$0" /root/setup.sh
+    cp -f "$0" /root/setup.sh
     chmod +x /root/setup.sh
 fi
 
-# Добавляем задачу в crontab для запуска после перезагрузки
+# Добавляем задачу в crontab
 (crontab -l 2>/dev/null | grep -v "@reboot /root/hestia_continue.sh"; echo "@reboot /root/hestia_continue.sh") | crontab -
 
 print_success "Данные сохранены, задача добавлена в crontab"
@@ -313,6 +318,7 @@ echo -e "  📂 Добавление доменов"
 echo -e "  📤 Загрузка файлов из репозитория"
 echo -e "  🔐 Установка SSL сертификатов"
 echo -e "  🔄 Включение HTTPS редиректа"
+echo -e "  🔄 Перезапуск PHP"
 echo -e "${YELLOW}Подключитесь через 2-3 минуты и проверьте результат.${NC}"
 
 sleep 10
