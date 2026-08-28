@@ -47,7 +47,7 @@ if [ -f /usr/local/hestia/bin/hestia ]; then
         PUBLIC_HTML="/home/$HESTIA_USER/web/$d/public_html"
         mkdir -p "$PUBLIC_HTML"
         
-        # 3. Удаляем ВСЕ старые файлы (index.html, index.php)
+        # 3. Удаляем ВСЕ старые файлы (index.html, index.php, .htaccess)
         echo "  🗑️ Удаление старых файлов..."
         rm -f "$PUBLIC_HTML/index.html"
         rm -f "$PUBLIC_HTML/index.php"
