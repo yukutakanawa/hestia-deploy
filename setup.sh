@@ -24,8 +24,8 @@ print_header() {
     echo -e "${MAGENTA}"
     echo "╔══════════════════════════════════════════════════════════════════╗"
     echo "║                                                                  ║"
-    echo "║     🚀  ${BOLD}AUTO HESTIACP SETUP${NC}${MAGENTA}                              ║"
-    echo "║     ${WHITE}Полная автоматическая установка${MAGENTA}                        ║"
+    echo -e "║     🚀  ${BOLD}AUTO HESTIACP SETUP${NC}${MAGENTA}                              ║"
+    echo -e "║     ${WHITE}Полная автоматическая установка${NC}${MAGENTA}                    ║"
     echo "║                                                                  ║"
     echo "╚══════════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
@@ -50,7 +50,7 @@ print_big_success() {
     echo -e "\n${GREEN}${BOLD}"
     echo "╔══════════════════════════════════════════════════════════════════╗"
     echo "║                                                                  ║"
-    echo "║     🎉  ${WHITE}ВСЕ ДОМЕНЫ УСПЕШНО НАСТРОЕНЫ!${GREEN}                      ║"
+    echo -e "║     🎉  ${WHITE}ВСЕ ДОМЕНЫ УСПЕШНО НАСТРОЕНЫ!${NC}${GREEN}                    ║"
     echo "║                                                                  ║"
     echo "╚══════════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
@@ -92,13 +92,11 @@ add_domain_safe() {
     local user="$1"
     local domain="$2"
     
-    # Проверяем, существует ли домен
     if v-list-web-domain "$user" "$domain" plain >/dev/null 2>&1; then
         print_info "Веб-домен $domain уже существует — используем его"
         return 0
     else
-        # Добавляем домен (он сам создаст web, dns, mail)
-        v-add-domain "$user" "$domain" 2>/dev/null
+        v-add-domain "$user" "$domain"
         if [ $? -eq 0 ]; then
             print_success "Домен $domain создан"
             return 0
@@ -119,7 +117,6 @@ if [ -f /usr/local/hestia/bin/hestia ]; then
     
     load_hestia_commands
     
-    # Запрашиваем данные
     echo -e "${CYAN}${BOLD}➜ Введите имя пользователя HestiaCP:${NC}"
     read -p "  " HESTIA_USER
     
@@ -136,7 +133,6 @@ if [ -f /usr/local/hestia/bin/hestia ]; then
         print_domain "Обработка: $d"
         print_separator
         
-        # БЕЗОПАСНОЕ добавление домена
         add_domain_safe "$HESTIA_USER" "$d"
         
         PUBLIC_HTML="/home/$HESTIA_USER/web/$d/public_html"
@@ -350,7 +346,6 @@ for d in "${DOMAINS[@]}"; do
     print_domain "Обработка домена: $d"
     print_separator
     
-    # БЕЗОПАСНОЕ добавление домена (без дублей)
     add_domain_safe "$HESTIA_USER" "$d"
     
     PUBLIC_HTML="/home/$HESTIA_USER/web/$d/public_html"
@@ -399,7 +394,12 @@ systemctl restart php8.5-fpm 2>/dev/null || systemctl restart php8.4-fpm 2>/dev/
 print_success "PHP перезапущен"
 
 # ============================================
-# 8. ИТОГ
+# 8. ОЧИСТКА
+# ============================================
+rm -rf /tmp/hestia-deploy
+
+# ============================================
+# 9. ИТОГ
 # ============================================
 echo ""
 print_big_success
@@ -423,7 +423,7 @@ echo -e "  ${CYAN}🔑 Пароль: (ваш пароль)${NC}"
 echo ""
 
 # ============================================
-# 9. ПЕРЕЗАГРУЗКА (В САМОМ КОНЦЕ)
+# 10. ПЕРЕЗАГРУЗКА (В САМОМ КОНЦЕ)
 # ============================================
 print_step "ЗАВЕРШЕНИЕ"
 print_warning "Все настройки выполнены! Сервер будет перезагружен через 10 секунд..."
