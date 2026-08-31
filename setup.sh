@@ -21,14 +21,14 @@ NC='\033[0m'
 # ФУНКЦИИ
 # ============================================
 print_header() {
-    echo -e "${MAGENTA}"
+    echo ""
     echo "╔══════════════════════════════════════════════════════════════════╗"
     echo "║                                                                  ║"
-    echo -e "║     🚀  ${BOLD}AUTO HESTIACP SETUP${NC}${MAGENTA}                              ║"
-    echo -e "║     ${WHITE}Полная автоматическая установка${NC}${MAGENTA}                    ║"
+    echo "║         AUTO HESTIACP SETUP                                      ║"
+    echo "║     Полная автоматическая установка                              ║"
     echo "║                                                                  ║"
     echo "╚══════════════════════════════════════════════════════════════════╝"
-    echo -e "${NC}"
+    echo ""
 }
 
 print_step() {
@@ -120,8 +120,32 @@ if [ -f /usr/local/hestia/bin/hestia ]; then
     echo -e "${CYAN}${BOLD}➜ Введите имя пользователя HestiaCP:${NC}"
     read -p "  " HESTIA_USER
     
-    echo -e "${CYAN}${BOLD}➜ Введите список доменов (через пробел):${NC}"
-    read -a DOMAINS
+    echo -e "${CYAN}${BOLD}➜ Введите домены (каждый с новой строки, для завершения Ctrl+D):${NC}"
+    echo -e "${YELLOW}Пример:${NC}"
+    echo "  sueyet.com"
+    echo "  sugarshackhome.com"
+    echo -e "${YELLOW}Для завершения ввода нажмите ${BOLD}Ctrl+D${NC}"
+    
+    DOMAINS=()
+    while IFS= read -r line; do
+        line=$(echo "$line" | xargs)
+        [ -z "$line" ] && continue
+        DOMAINS+=("$line")
+    done
+    
+    if [ ${#DOMAINS[@]} -eq 0 ]; then
+        print_error "Не введено ни одного домена!"
+        exit 1
+    fi
+    
+    print_success "Добавлено ${#DOMAINS[@]} доменов"
+    echo ""
+    
+    echo -e "${GREEN}${BOLD}📋 Список доменов:${NC}"
+    for i in "${!DOMAINS[@]}"; do
+        echo "  $((i+1)). ${DOMAINS[$i]}"
+    done
+    echo ""
     
     print_info "Клонирование репозитория..."
     rm -rf /tmp/hestia-deploy
@@ -241,36 +265,33 @@ print_info "Email: $EMAIL"
 echo ""
 
 # ============================================
-# 2. ВВОД ДОМЕНОВ
+# 2. ВВОД ДОМЕНОВ (ЧЕРЕЗ МАССИВ)
 # ============================================
-echo -e "${CYAN}${BOLD}➜ Вставьте список доменов (в любом формате):${NC}"
-echo -e "${YELLOW}Поддерживаются форматы:${NC}"
-echo "  • Через пробел: site1.com site2.com site3.com"
-echo "  • Каждый с новой строки"
+echo -e "${CYAN}${BOLD}➜ Введите домены (каждый с новой строки, для завершения Ctrl+D):${NC}"
+echo -e "${YELLOW}Пример:${NC}"
+echo "  sueyet.com"
+echo "  sugarshackhome.com"
+echo "  synexaisystems.com"
 echo -e "${YELLOW}Для завершения ввода нажмите ${BOLD}Ctrl+D${NC}"
-echo -e "${CYAN}${BOLD}➜ Вставьте список доменов:${NC}"
+echo -e "${CYAN}${BOLD}➜ Введите домены:${NC}"
 
-DOMAIN_INPUT=""
+DOMAINS=()
 while IFS= read -r line; do
+    line=$(echo "$line" | xargs)
     [ -z "$line" ] && continue
-    DOMAIN_INPUT="$DOMAIN_INPUT $line"
+    DOMAINS+=("$line")
 done
 
-if [ -n "$DOMAIN_INPUT" ]; then
-    read -ra DOMAINS <<< "$DOMAIN_INPUT"
-    for i in "${!DOMAINS[@]}"; do
-        DOMAINS[$i]=$(echo "${DOMAINS[$i]}" | xargs)
-    done
-    print_success "Добавлено ${#DOMAINS[@]} доменов"
-else
+if [ ${#DOMAINS[@]} -eq 0 ]; then
     print_error "Не введено ни одного домена!"
     exit 1
 fi
 
+print_success "Добавлено ${#DOMAINS[@]} доменов"
+
 echo ""
 
-echo -e "${GREEN}${BOLD}📋 Всего доменов: ${#DOMAINS[@]}${NC}"
-echo -e "${YELLOW}Список доменов:${NC}"
+echo -e "${GREEN}${BOLD}📋 Список доменов:${NC}"
 for i in "${!DOMAINS[@]}"; do
     echo "  $((i+1)). ${DOMAINS[$i]}"
 done
