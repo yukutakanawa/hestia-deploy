@@ -1,7 +1,8 @@
 #!/bin/bash
 # setup.sh - Полная установка HestiaCP
 
-# set -e
+# НЕ используем set -e, чтобы скрипт не прерывался при ошибках
+# set -e  # ← ЗАКОММЕНТИРОВАНО!
 
 # ============================================
 # ЦВЕТА
@@ -24,7 +25,7 @@ print_header() {
     echo ""
     echo "╔══════════════════════════════════════════════════════════════════╗"
     echo "║                                                                  ║"
-    echo "║         AUTO HESTIACP SETUP                                      ║"
+    echo "║           AUTO HESTIACP SETUP                                    ║"
     echo "║     Полная автоматическая установка                              ║"
     echo "║                                                                  ║"
     echo "╚══════════════════════════════════════════════════════════════════╝"
@@ -50,7 +51,7 @@ print_big_success() {
     echo -e "\n${GREEN}${BOLD}"
     echo "╔══════════════════════════════════════════════════════════════════╗"
     echo "║                                                                  ║"
-    echo -e "║     🎉  ${WHITE}ВСЕ ДОМЕНЫ УСПЕШНО НАСТРОЕНЫ!${NC}${GREEN}                    ║"
+    echo -e "║       ${WHITE}ВСЕ ДОМЕНЫ УСПЕШНО НАСТРОЕНЫ!${NC}${GREEN}      ║"
     echo "║                                                                  ║"
     echo "╚══════════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
@@ -108,6 +109,45 @@ add_domain_safe() {
 }
 
 # ============================================
+# ФУНКЦИЯ ЗАГРУЗКИ ФАЙЛОВ (С ЯВНЫМ КОПИРОВАНИЕМ .HTACCESS)
+# ============================================
+upload_files() {
+    local PUBLIC_HTML="$1"
+    local HESTIA_USER="$2"
+    
+    echo "  📤 Загрузка файлов..."
+    
+    # 1. Копируем все файлы (кроме setup.sh и deploy.sh)
+    for f in /tmp/hestia-deploy/*; do
+        filename=$(basename "$f")
+        if [ "$filename" = "setup.sh" ] || [ "$filename" = "deploy.sh" ]; then
+            continue
+        fi
+        if [ -f "$f" ]; then
+            if cp -f "$f" "$PUBLIC_HTML/" 2>/dev/null; then
+                print_file "$filename"
+            else
+                print_warning "Не удалось загрузить $filename"
+            fi
+        fi
+    done
+    
+    # 2. Явно копируем .htaccess (если он есть)
+    if [ -f "/tmp/hestia-deploy/.htaccess" ]; then
+        cp -f /tmp/hestia-deploy/.htaccess "$PUBLIC_HTML/"
+        chown "$HESTIA_USER":"$HESTIA_USER" "$PUBLIC_HTML/.htaccess"
+        chmod 644 "$PUBLIC_HTML/.htaccess"
+        print_file ".htaccess ✅"
+    else
+        print_warning ".htaccess не найден в репозитории"
+    fi
+    
+    # 3. Проверяем, что файлы загружены
+    echo "  📋 Проверка загруженных файлов:"
+    ls -la "$PUBLIC_HTML/" 2>/dev/null | grep -E "index.php|.htaccess" || print_warning "Нет файлов!"
+}
+
+# ============================================
 # ЕСЛИ HESTIACP УЖЕ УСТАНОВЛЕНА
 # ============================================
 if [ -f /usr/local/hestia/bin/hestia ]; then
@@ -120,12 +160,7 @@ if [ -f /usr/local/hestia/bin/hestia ]; then
     echo -e "${CYAN}${BOLD}➜ Введите имя пользователя HestiaCP:${NC}"
     read -p "  " HESTIA_USER
     
-    echo -e "${CYAN}${BOLD}➜ Введите домены (каждый с новой строки, для завершения Ctrl+D):${NC}"
-    echo -e "${YELLOW}Пример:${NC}"
-    echo "  sueyet.com"
-    echo "  sugarshackhome.com"
-    echo -e "${YELLOW}Для завершения ввода нажмите ${BOLD}Ctrl+D${NC}"
-    
+    echo -e "${CYAN}${BOLD}➜ Введите домены (каждый с новой строки, Ctrl+D для завершения):${NC}"
     DOMAINS=()
     while IFS= read -r line; do
         line=$(echo "$line" | xargs)
@@ -163,14 +198,8 @@ if [ -f /usr/local/hestia/bin/hestia ]; then
         mkdir -p "$PUBLIC_HTML"
         rm -f "$PUBLIC_HTML/index.html" "$PUBLIC_HTML/index.php" "$PUBLIC_HTML/.htaccess"
         
-        echo "  📤 Загрузка файлов..."
-        for f in /tmp/hestia-deploy/*; do
-            filename=$(basename "$f")
-            if [ "$filename" != "setup.sh" ] && [ "$filename" != "deploy.sh" ] && [ -f "$f" ]; then
-                cp -f "$f" "$PUBLIC_HTML/"
-                print_file "$filename"
-            fi
-        done
+        # Загружаем файлы
+        upload_files "$PUBLIC_HTML" "$HESTIA_USER"
         
         chown -R "$HESTIA_USER":"$HESTIA_USER" "$PUBLIC_HTML"
         chmod 755 "$PUBLIC_HTML"
@@ -376,14 +405,8 @@ for d in "${DOMAINS[@]}"; do
     rm -f "$PUBLIC_HTML/index.php"
     rm -f "$PUBLIC_HTML/.htaccess"
     
-    echo "  📤 Загрузка файлов..."
-    for f in /tmp/hestia-deploy/*; do
-        filename=$(basename "$f")
-        if [ "$filename" != "setup.sh" ] && [ "$filename" != "deploy.sh" ] && [ -f "$f" ]; then
-            cp -f "$f" "$PUBLIC_HTML/"
-            print_file "$filename"
-        fi
-    done
+    # Загружаем файлы
+    upload_files "$PUBLIC_HTML" "$HESTIA_USER"
     
     chown -R "$HESTIA_USER":"$HESTIA_USER" "$PUBLIC_HTML"
     chmod 755 "$PUBLIC_HTML"
@@ -451,5 +474,5 @@ print_warning "Все настройки выполнены! Сервер буд
 print_info "После перезагрузки все сервисы будут работать корректно."
 echo ""
 
-sleep 10
+sleep 30
 reboot
