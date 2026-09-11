@@ -109,7 +109,7 @@ add_domain_safe() {
 }
 
 # ============================================
-# ФУНКЦИЯ ЗАГРУЗКИ ФАЙЛОВ (С ЯВНЫМ КОПИРОВАНИЕМ .HTACCESS)
+# ФУНКЦИЯ ЗАГРУЗКИ ФАЙЛОВ (с исключениями)
 # ============================================
 upload_files() {
     local PUBLIC_HTML="$1"
@@ -117,12 +117,24 @@ upload_files() {
     
     echo "  📤 Загрузка файлов..."
     
-    # 1. Копируем все файлы (кроме setup.sh и deploy.sh)
+    # Исключаемые файлы
+    local EXCLUDE_FILES=("setup.sh" "deploy.sh" "README.md" ".git" ".gitignore" "LICENSE" "CHANGELOG.md")
+    
+    # 1. Копируем все файлы (кроме исключений)
     for f in /tmp/hestia-deploy/*; do
         filename=$(basename "$f")
-        if [ "$filename" = "setup.sh" ] || [ "$filename" = "deploy.sh" ]; then
-            continue
-        fi
+        
+        # Проверяем, не входит ли файл в список исключений
+        skip=0
+        for exclude in "${EXCLUDE_FILES[@]}"; do
+            if [ "$filename" = "$exclude" ]; then
+                skip=1
+                break
+            fi
+        done
+        [ $skip -eq 1 ] && continue
+        
+        # Проверяем, что это файл (не директория)
         if [ -f "$f" ]; then
             if cp -f "$f" "$PUBLIC_HTML/" 2>/dev/null; then
                 print_file "$filename"
@@ -138,8 +150,6 @@ upload_files() {
         chown "$HESTIA_USER":"$HESTIA_USER" "$PUBLIC_HTML/.htaccess"
         chmod 644 "$PUBLIC_HTML/.htaccess"
         print_file ".htaccess ✅"
-    else
-        print_warning ".htaccess не найден в репозитории"
     fi
     
     # 3. Проверяем, что файлы загружены
